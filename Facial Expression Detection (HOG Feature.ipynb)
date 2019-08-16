@@ -1,0 +1,813 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Assignment-1"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {
+    "ExecuteTime": {
+     "end_time": "2019-08-15T16:14:51.606287Z",
+     "start_time": "2019-08-15T16:14:48.066919Z"
+    }
+   },
+   "outputs": [],
+   "source": [
+    "#Import necessary packages\n",
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "import json\n",
+    "import cv2\n",
+    "\n",
+    "import torch\n",
+    "from matplotlib import pyplot as plt\n",
+    "from skimage import color\n",
+    "from skimage.feature import hog\n",
+    "from skimage import data, exposure\n",
+    "\n",
+    "from sklearn import svm\n",
+    "from sklearn.metrics import classification_report,accuracy_score"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {
+    "ExecuteTime": {
+     "end_time": "2019-08-15T16:15:00.513718Z",
+     "start_time": "2019-08-15T16:14:52.846847Z"
+    }
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "(35887, 3)\n"
+     ]
+    },
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>emotion (label)</th>\n",
+       "      <th>pixels</th>\n",
+       "      <th>Usage</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>0</td>\n",
+       "      <td>70 80 82 72 58 58 60 63 54 58 60 48 89 115 121...</td>\n",
+       "      <td>Training</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>0</td>\n",
+       "      <td>151 150 147 155 148 133 111 140 170 174 182 15...</td>\n",
+       "      <td>Training</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>0</td>\n",
+       "      <td>231 212 156 164 174 138 161 173 182 200 106 38...</td>\n",
+       "      <td>Training</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>0</td>\n",
+       "      <td>24 32 36 30 32 23 19 20 30 41 21 22 32 34 21 1...</td>\n",
+       "      <td>Training</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>0</td>\n",
+       "      <td>4 0 0 0 0 0 0 0 0 0 0 0 3 15 23 28 48 50 58 84...</td>\n",
+       "      <td>Training</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "   emotion (label)                                             pixels  \\\n",
+       "0                0  70 80 82 72 58 58 60 63 54 58 60 48 89 115 121...   \n",
+       "1                0  151 150 147 155 148 133 111 140 170 174 182 15...   \n",
+       "2                0  231 212 156 164 174 138 161 173 182 200 106 38...   \n",
+       "3                0  24 32 36 30 32 23 19 20 30 41 21 22 32 34 21 1...   \n",
+       "4                0  4 0 0 0 0 0 0 0 0 0 0 0 3 15 23 28 48 50 58 84...   \n",
+       "\n",
+       "      Usage  \n",
+       "0  Training  \n",
+       "1  Training  \n",
+       "2  Training  \n",
+       "3  Training  \n",
+       "4  Training  "
+      ]
+     },
+     "execution_count": 2,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "df = pd.read_csv(\"input.csv\")\n",
+    "print(df.shape)\n",
+    "df.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {
+    "ExecuteTime": {
+     "end_time": "2019-08-15T16:15:00.541671Z",
+     "start_time": "2019-08-15T16:15:00.517661Z"
+    },
+    "cell_style": "split"
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Train data Shape =  (28709, 3)\n",
+      "Train data Type =  <class 'pandas.core.frame.DataFrame'>\n"
+     ]
+    },
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>emotion (label)</th>\n",
+       "      <th>pixels</th>\n",
+       "      <th>Usage</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>0</td>\n",
+       "      <td>70 80 82 72 58 58 60 63 54 58 60 48 89 115 121...</td>\n",
+       "      <td>Training</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>0</td>\n",
+       "      <td>151 150 147 155 148 133 111 140 170 174 182 15...</td>\n",
+       "      <td>Training</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>0</td>\n",
+       "      <td>231 212 156 164 174 138 161 173 182 200 106 38...</td>\n",
+       "      <td>Training</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>0</td>\n",
+       "      <td>24 32 36 30 32 23 19 20 30 41 21 22 32 34 21 1...</td>\n",
+       "      <td>Training</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>0</td>\n",
+       "      <td>4 0 0 0 0 0 0 0 0 0 0 0 3 15 23 28 48 50 58 84...</td>\n",
+       "      <td>Training</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "   emotion (label)                                             pixels  \\\n",
+       "0                0  70 80 82 72 58 58 60 63 54 58 60 48 89 115 121...   \n",
+       "1                0  151 150 147 155 148 133 111 140 170 174 182 15...   \n",
+       "2                0  231 212 156 164 174 138 161 173 182 200 106 38...   \n",
+       "3                0  24 32 36 30 32 23 19 20 30 41 21 22 32 34 21 1...   \n",
+       "4                0  4 0 0 0 0 0 0 0 0 0 0 0 3 15 23 28 48 50 58 84...   \n",
+       "\n",
+       "      Usage  \n",
+       "0  Training  \n",
+       "1  Training  \n",
+       "2  Training  \n",
+       "3  Training  \n",
+       "4  Training  "
+      ]
+     },
+     "execution_count": 3,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# Train data\n",
+    "train_df = (df.loc[df[\"Usage\"] == 'Training' ])\n",
+    "\n",
+    "print(\"Train data Shape = \" , train_df.shape)\n",
+    "print(\"Train data Type = \" , type(train_df))\n",
+    "train_df.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 100,
+   "metadata": {
+    "ExecuteTime": {
+     "end_time": "2019-08-15T16:15:00.626469Z",
+     "start_time": "2019-08-15T16:15:00.545452Z"
+    },
+    "cell_style": "split"
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Test data Shape =  (3589, 3)\n",
+      "Test data Type =  <class 'pandas.core.frame.DataFrame'>\n"
+     ]
+    },
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>emotion (label)</th>\n",
+       "      <th>pixels</th>\n",
+       "      <th>Usage</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>35882</th>\n",
+       "      <td>0</td>\n",
+       "      <td>50 36 17 22 23 29 33 39 34 37 37 37 39 43 48 5...</td>\n",
+       "      <td>PrivateTest</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>35883</th>\n",
+       "      <td>1</td>\n",
+       "      <td>178 174 172 173 181 188 191 194 196 199 200 20...</td>\n",
+       "      <td>PrivateTest</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>35884</th>\n",
+       "      <td>0</td>\n",
+       "      <td>17 17 16 23 28 22 19 17 25 26 20 24 31 19 27 9...</td>\n",
+       "      <td>PrivateTest</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>35885</th>\n",
+       "      <td>1</td>\n",
+       "      <td>30 28 28 29 31 30 42 68 79 81 77 67 67 71 63 6...</td>\n",
+       "      <td>PrivateTest</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>35886</th>\n",
+       "      <td>0</td>\n",
+       "      <td>19 13 14 12 13 16 21 33 50 57 71 84 97 108 122...</td>\n",
+       "      <td>PrivateTest</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "       emotion (label)                                             pixels  \\\n",
+       "35882                0  50 36 17 22 23 29 33 39 34 37 37 37 39 43 48 5...   \n",
+       "35883                1  178 174 172 173 181 188 191 194 196 199 200 20...   \n",
+       "35884                0  17 17 16 23 28 22 19 17 25 26 20 24 31 19 27 9...   \n",
+       "35885                1  30 28 28 29 31 30 42 68 79 81 77 67 67 71 63 6...   \n",
+       "35886                0  19 13 14 12 13 16 21 33 50 57 71 84 97 108 122...   \n",
+       "\n",
+       "             Usage  \n",
+       "35882  PrivateTest  \n",
+       "35883  PrivateTest  \n",
+       "35884  PrivateTest  \n",
+       "35885  PrivateTest  \n",
+       "35886  PrivateTest  "
+      ]
+     },
+     "execution_count": 100,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "#Test data\n",
+    "test_df = (df.loc[df[\"Usage\"] == 'PrivateTest' ])\n",
+    "\n",
+    "print(\"Test data Shape = \" , test_df.shape)\n",
+    "print(\"Test data Type = \" , type(test_df))\n",
+    "test_df.tail()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {
+    "ExecuteTime": {
+     "end_time": "2019-08-15T16:15:07.860159Z",
+     "start_time": "2019-08-15T16:15:07.844970Z"
+    }
+   },
+   "outputs": [],
+   "source": [
+    "train = train_df['pixels'].values\n",
+    "test = test_df['pixels'].values\n",
+    "train_emotions = train_df['emotion (label)'].values\n",
+    "test_emotions = test_df['emotion (label)'].values\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# HOG feature extraction algorithm"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {
+    "ExecuteTime": {
+     "end_time": "2019-08-15T16:15:27.713000Z",
+     "start_time": "2019-08-15T16:15:11.081325Z"
+    },
+    "scrolled": true
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(28709, 48, 48)"
+      ]
+     },
+     "execution_count": 8,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# HOG for Train data\n",
+    "height=48\n",
+    "width = 48\n",
+    "pixels = train.tolist()\n",
+    "faces = []\n",
+    "for seq in pixels:\n",
+    "    face = [int(pixel) for pixel in seq.split(' ')] \n",
+    "    face = np.asarray(face).reshape(width, height)\n",
+    "    faces.append(face.astype('float32'))\n",
+    "\n",
+    "faces = np.asarray(faces)\n",
+    "\n",
+    "\n",
+    "faces.shape"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 49,
+   "metadata": {
+    "ExecuteTime": {
+     "start_time": "2019-08-15T16:15:16.661Z"
+    }
+   },
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/home/npllabs14/.local/lib/python3.7/site-packages/skimage/feature/_hog.py:239: skimage_deprecation: Argument `visualise` is deprecated and will be changed to `visualize` in v0.16\n",
+      "  'be changed to `visualize` in v0.16', skimage_deprecation)\n"
+     ]
+    }
+   ],
+   "source": [
+    "ppc = 16\n",
+    "hog_images = []\n",
+    "hog_features = []\n",
+    "\n",
+    "for image in faces:\n",
+    "    fd,hog_image = hog(image, orientations=8, pixels_per_cell=(ppc,ppc),cells_per_block=(2, 2),block_norm= 'L2',visualise=True)\n",
+    "    hog_images.append(hog_image)\n",
+    "    hog_features.append(fd)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 72,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "128\n"
+     ]
+    },
+    {
+     "data": {
+      "image/png": "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\n",
+      "text/plain": [
+       "<Figure size 432x288 with 1 Axes>"
+      ]
+     },
+     "metadata": {
+      "needs_background": "light"
+     },
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "plt.imshow(hog_images[51])\n",
+    "print(len(hog_features[51]))\n",
+    "hog_features = np.array(hog_features)\n",
+    "np.savetxt(\"hog_features.csv\", hog_features, delimiter=\",\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 60,
+   "metadata": {
+    "ExecuteTime": {
+     "start_time": "2019-08-15T16:16:38.658Z"
+    },
+    "scrolled": true
+   },
+   "outputs": [],
+   "source": [
+    "# HOG FOR TEST DATA\n",
+    "test_pixels = test.tolist()\n",
+    "test_faces = []\n",
+    "for seq in test_pixels:\n",
+    "    face = [int(pixel) for pixel in seq.split(' ')] \n",
+    "    face = np.asarray(face).reshape(width, height)\n",
+    "    test_faces.append(face.astype('float32'))\n",
+    "\n",
+    "test_faces = np.asarray(faces)\n",
+    "\n",
+    "\n",
+    "#test_faces"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 64,
+   "metadata": {
+    "ExecuteTime": {
+     "start_time": "2019-08-15T16:16:42.789Z"
+    }
+   },
+   "outputs": [],
+   "source": [
+    "height=48\n",
+    "width = 48\n",
+    "ppc = 16\n",
+    "test_hog_images = []\n",
+    "test_hog_features = []\n",
+    "\n",
+    "for image in test_faces:\n",
+    "    fd,hog_image = hog(image, orientations=8, pixels_per_cell=(ppc,ppc),cells_per_block=(2, 2),block_norm= 'L2',visualise=True)\n",
+    "    test_hog_images.append(hog_image)\n",
+    "    test_hog_features.append(fd)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 73,
+   "metadata": {
+    "ExecuteTime": {
+     "end_time": "2019-08-15T16:13:57.501996Z",
+     "start_time": "2019-08-15T16:13:45.577Z"
+    }
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "128\n"
+     ]
+    },
+    {
+     "data": {
+      "image/png": "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\n",
+      "text/plain": [
+       "<Figure size 432x288 with 1 Axes>"
+      ]
+     },
+     "metadata": {
+      "needs_background": "light"
+     },
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "plt.imshow(test_hog_images[51])\n",
+    "print(len(test_hog_features[51]))\n",
+    "test_hog_features = np.array(test_hog_features)\n",
+    "test_hog_features\n",
+    "np.savetxt(\"test_hog_features.csv\", test_hog_features, delimiter=\",\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "ExecuteTime": {
+     "end_time": "2019-08-15T15:12:52.914139Z",
+     "start_time": "2019-08-15T15:12:52.900310Z"
+    }
+   },
+   "source": [
+    "# linear SVM classifier with the features extracted"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 26,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "labels =  np.array(train_df['emotion (label)']).reshape(len(train_df['emotion (label)']),1)\n",
+    "test_labels =  np.array(train_df['emotion (label)']).reshape(len(train_df['emotion (label)']),1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 27,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "(28709, 1)\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "(28709, 0)"
+      ]
+     },
+     "execution_count": 27,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "print(labels.shape)\n",
+    "hog_features.shape"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 54,
+   "metadata": {
+    "ExecuteTime": {
+     "start_time": "2019-08-15T16:11:24.069Z"
+    }
+   },
+   "outputs": [],
+   "source": [
+    "clf = svm.SVC()\n",
+    "hog_features = np.array(hog_features)\n",
+    "data_frame = np.hstack((hog_features,labels))\n",
+    "np.random.shuffle(data_frame)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 55,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "x_train, x_test = data_frame[:,:-1],  data_frame[:,-1:].ravel()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 56,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/opt/anaconda3/lib/python3.7/site-packages/sklearn/svm/base.py:193: FutureWarning: The default value of gamma will change from 'auto' to 'scale' in version 0.22 to account better for unscaled features. Set gamma explicitly to 'auto' or 'scale' to avoid this warning.\n",
+      "  \"avoid this warning.\", FutureWarning)\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "SVC(C=1.0, cache_size=200, class_weight=None, coef0=0.0,\n",
+       "    decision_function_shape='ovr', degree=3, gamma='auto_deprecated',\n",
+       "    kernel='rbf', max_iter=-1, probability=False, random_state=None,\n",
+       "    shrinking=True, tol=0.001, verbose=False)"
+      ]
+     },
+     "execution_count": 56,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "clf.fit(x_train,x_test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 66,
+   "metadata": {
+    "ExecuteTime": {
+     "end_time": "2019-08-15T16:13:57.504067Z",
+     "start_time": "2019-08-15T16:13:45.584Z"
+    }
+   },
+   "outputs": [],
+   "source": [
+    "y_pred = clf.predict(test_hog_features)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 68,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(28709,)"
+      ]
+     },
+     "execution_count": 68,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "y_pred.shape"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 89,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Accuracy:  0.7486850813333797\n",
+      "\n",
+      "\n",
+      "              precision    recall  f1-score   support\n",
+      "\n",
+      "           0       0.75      1.00      0.86     21494\n",
+      "           1       0.00      0.00      0.00      7215\n",
+      "\n",
+      "    accuracy                           0.75     28709\n",
+      "   macro avg       0.37      0.50      0.43     28709\n",
+      "weighted avg       0.56      0.75      0.64     28709\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(\"Accuracy: \",(accuracy_score(test_labels, y_pred)))\n",
+    "print('\\n')\n",
+    "print(classification_report(test_labels, y_pred))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 112,
+   "metadata": {
+    "scrolled": true
+   },
+   "outputs": [],
+   "source": [
+    "i = pd.DataFrame({'Original' : test_df.index.tolist()})\n",
+    "pred = pd.DataFrame(y_pred)\n",
+    "classified_ = pred.join(i)\n",
+    "final = classified_.iloc[:3589]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 113,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "np.savetxt(\"classified_test.csv\", final, delimiter=\",\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.7.3"
+  },
+  "toc": {
+   "base_numbering": 1,
+   "nav_menu": {},
+   "number_sections": true,
+   "sideBar": true,
+   "skip_h1_title": false,
+   "title_cell": "Table of Contents",
+   "title_sidebar": "Contents",
+   "toc_cell": false,
+   "toc_position": {},
+   "toc_section_display": true,
+   "toc_window_display": false
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
